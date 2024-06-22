@@ -1,0 +1,48 @@
+# IDEA/DRAFT: SCHEMA 2
+{
+    parameters: {
+        my_object: {
+            type: "object",
+            default: {},
+            valid_values: [ 
+                "value_1",
+                "value_2",
+            ],
+            valid_keys: { # Comment
+                key_1: "string",
+                key_2: "object",
+                key_3: "int",
+            },
+        },
+        my_list: {
+            type: "list",
+            default: [],
+            valid_items: [
+                "string",
+            ],
+        },
+        my_string: {
+            type: string,
+            default: "",
+        },
+        my_int: {
+            type: "int",
+            default: 0,
+        },
+        my_float:  {
+            type: "float",
+            default: 0,
+        },
+        my_number:  {
+            type: "number",
+            default: 0,
+        },
+        my_boolean: {
+            type: "boolean",
+            default: "True",
+        },
+    },
+    required: [
+        "my_string",
+    ],
+},

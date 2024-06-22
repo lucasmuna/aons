@@ -1,0 +1,48 @@
+# IDEA/DRAFT
+# A1
+# B2
+# C3
+{
+    my_string: "my string value", # COMMENT A
+    my_string_2: "my string '2' value", # COMMENT B
+    my_string_3: 'my string "3" value', # COMMENT C
+    my_int: 1, # COMMENT D
+    my_object_object: { # COMMENT E
+        my_sub_object: {
+            my_sub_int: 2, # COMMENT F
+        },
+    },
+    my_object_list: { # COMMENT E
+        my_sub_list: [
+            1,
+            2,
+            3, # COMMENT F
+        ],
+    },
+    my_int_2: 2, # COMMENT G
+    my_list_int: [ # COMMENT H
+        2,
+        2,
+    ],
+    my_list_dict: [ # COMMENT I
+        {
+            a: {
+                aa: 3,
+            },
+        },
+        {
+            b: 2,
+        },
+    ],
+    my_list_list: [ # COMMENT J
+        [
+            1,
+            1,
+        ],
+        [
+            2,
+            2,
+        ],
+    ],
+},
+# D4
