@@ -1,4 +1,5 @@
-pylint aons.py
-isort aons.py --profile="black"
-black aons.py
-ruff check aons.py
+poetry run pylint aons.py
+poetry run isort aons.py
+poetry run black aons.py
+poetry run ruff check aons.py
+poetry run mypy aons.py
