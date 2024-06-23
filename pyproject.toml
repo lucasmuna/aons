@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "aons"
+version = "0.0.0"
+description = "Another Object Notation Syntax."
+authors = ["Lucas Munaretto <lucas.munaretto@hotmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+isort = "^5.13.2"
+pylint = "^3.2.3"
+mypy = "^1.10.0"
+ruff = "^0.4.10"
+
+[tool.pylint.'MASTER']
+# ignore=
+#     path/to/ignore
+
+[tool.pylint.'DESIGN']
+max-args=6
+
+[tool.pylint.'MESSAGES CONTROL']
+disable = [
+	"protected-access",
+	"too-few-public-methods",
+	"too-many-instance-attributes",
+	"too-many-lines",
+	# Allows the usage of comments with "TODO: message"
+    "fixme",
+]
+
+[tool.isort]
+profile = "black"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

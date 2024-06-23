@@ -37,7 +37,7 @@ class _Comment:
     value: str = ""
 
     @classmethod
-    def from_token(cls: "_Comment", token_info: tokenize.TokenInfo) -> "_Comment":
+    def from_token(cls, token_info: tokenize.TokenInfo):
         """Creates a class instance out of a token_info."""
         return cls(value=token_info.string)
 
@@ -213,7 +213,7 @@ class _KeyList(_Key):
                 _, token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name, "list", value_list, comment=comment)
+                return cls(name, "list", value_list, comment="\n".join(comment))
             if value := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(value, _Comment):
                     if value_list:
