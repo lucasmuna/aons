@@ -45,7 +45,6 @@ class _Comment:
 @dataclasses.dataclass
 class _Key(abc.ABC):
     name: str | None
-    key_type: _KeyLiteralTypes  # TODO: Remove this unnecessary attribute.
     value: Any
     comment: str | None = None
 
@@ -105,11 +104,11 @@ class _KeySingle(_Key):
         if token_info.type != token.OP and token_info.string != ",":
             raise AonsContentLineNotEndedWithComma
         if token_type == "str":
-            return _KeyString(name, token_type, value)
+            return _KeyString(name, value)
         if token_type == "float":
-            return _KeyFloat(name, token_type, value)
+            return _KeyFloat(name, value)
         if token_type == "int":
-            return _KeyInteger(name, token_type, value)
+            return _KeyInteger(name, value)
         raise AonsUnknownKeyType
 
     def get_dict(self) -> dict:
@@ -163,7 +162,7 @@ class _KeyObject(_Key):
                 _, token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name, "object", key_list)
+                return cls(name, key_list)
             if key := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(key, _Comment):
                     if key_list:
@@ -213,7 +212,7 @@ class _KeyList(_Key):
                 _, token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name, "list", value_list, comment="\n".join(comment))
+                return cls(name, value_list, comment="\n".join(comment))
             if value := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(value, _Comment):
                     if value_list:
