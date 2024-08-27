@@ -73,12 +73,19 @@ class _Key(abc.ABC):
             return _Comment.from_token(token_info)
         return None
 
+    # We have to have separate impl for single list and dict
+    def __getitem__(self, key):
+        return self.value[key]
+
+    def __setitem__(self, key, value):
+        self.value[key].value = value
+
     @abc.abstractmethod
-    def get_dict(self) -> dict:
+    def get_dict(self) -> Any:  # We should probably change this method name
         """Returns a dictionary containing the respective instance data."""
 
     def _dict_with_comments_template(self, value: Any):
-        return {self.name: {"__comment__": self.comment, "__value__": value}}
+        return {"__comment__": self.comment, "__value__": value}
 
     @abc.abstractmethod
     def get_dict_with_comment(self) -> dict:
@@ -113,7 +120,7 @@ class _KeySingle(_Key):
 
     def get_dict(self) -> dict:
         """Concrete implementation of _Key.get_dict."""
-        return {self.name: self.value}
+        return self.value
 
     def get_dict_with_comment(self) -> dict:
         """Concrete implementation of _Key.get_dict_with_comment."""
@@ -148,51 +155,43 @@ class _KeyString(_KeySingle):
 
 @dataclasses.dataclass
 class _KeyObject(_Key):
-    value: list[_Key]
+    value: dict[str, Any]
 
     @classmethod
     def from_name_and_token_iterator(
         cls, name: str | None, token_it: enumerate[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
-        key_list: list[_Key] = []
+        last_key_name: str = ""
+        key_dict: dict[str, Any] = {}
         comment: list[str] = []
         for _, token_info in token_it:
             if token_info.type == token.OP and token_info.string == "}":
                 _, token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name, key_list)
+                return cls(name, key_dict, comment="\n".join(comment))
             if key := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(key, _Comment):
-                    if key_list:
-                        key_list[-1].comment = key.value
+                    if last_key_name:
+                        key_dict[last_key_name].comment = key.value
                     else:
-                        # TODO: Try to improve this code / functionality.
-                        #       Think about different comment use cases, one-line, multi-line etc.
                         comment.append(key.value)
                 else:
-                    key_list.append(key)
+                    key_dict[key.name] = key
+                    last_key_name = key.name
         raise AonsFileWithoutMainElement
 
     def get_dict(self) -> dict:
         """Concrete implementation of _Key.get_dict."""
-        return {
-            self.name: {
-                key: value
-                for item in self.value
-                for key, value in item.get_dict().items()
-            }
-        }
+        return {key: value.get_dict() for key, value in self.value.items()}
 
     def get_dict_with_comment(self) -> dict:
         """Concrete implementation of _Key.get_dict_with_comment."""
         return self._dict_with_comments_template(
             value={
-                key: value
-                for item in self.value
-                for key, value in item.get_dict_with_comment().items()
-            },
+                key: item.get_dict_with_comment() for key, item in self.value.items()
+            }
         )
 
 
@@ -223,22 +222,14 @@ class _KeyList(_Key):
                     value_list.append(value)
         raise AonsFileWithoutMainElement
 
-    def get_dict(self) -> dict:
+    def get_dict(self) -> list:
         """Concrete implementation of _Key.get_dict."""
-        return {
-            self.name: [
-                value for item in self.value for _, value in item.get_dict().items()
-            ]
-        }
+        return [value.get_dict() for value in self.value]
 
     def get_dict_with_comment(self) -> dict:
         """Concrete implementation of _Key.get_dict_with_comment."""
         return self._dict_with_comments_template(
-            value={
-                key: value
-                for item in self.value
-                for key, value in item.get_dict_with_comment().items()
-            },
+            value=[value.get_dict_with_comment() for value in self.value]
         )
 
 
@@ -250,6 +241,12 @@ class _AonsFile:
         )
         self._encoding = self._get_encoding()
         self._entries = self._get_entries()
+
+    def __getitem__(self, key):
+        return self._entries.value[key]
+
+    def __setitem__(self, key, value):
+        self._entries.value[key].value = value
 
     def _get_encoding(self) -> str:
         """Get AONS file enconding from the first token."""
@@ -271,7 +268,7 @@ class _AonsFile:
 
     def get_dict(self) -> dict:
         """Returns a dictionary containing data from every entry."""
-        return self._entries.get_dict()[None]
+        return self._entries.get_dict()
 
     def get_dict_with_comments(self) -> dict:
         """Returns a dictionary containing data and comments from every entry.
@@ -285,6 +282,23 @@ class _AonsFile:
 class AonsSchema(_AonsFile):
     """AONS schema base class."""
 
+    # Do we need to separate AonsData and AonsSchema?
+
 
 class AonsData(_AonsFile):
     """AONS data base class."""
+
+    # Do we need to separate AonsData and AonsSchema?
+
+
+def load(file: pathlib.Path):
+    """Load an AONS file from a given path and return an AonsFile class instance."""
+    raise NotImplementedError
+    # aons_file = _AonsFile(file)
+
+
+def validate(data: AonsData, schema: AonsSchema):
+    """Validate a given AONS data against a given AONS schema."""
+    raise NotImplementedError
+    # data = data.get_dict()
+    # schema = schema.get_dict()
