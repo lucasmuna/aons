@@ -12,19 +12,19 @@
             my_sub_int: 2, # COMMENT F
         },
     },
-    my_object_list: { # COMMENT E
+    my_object_list: { # COMMENT G
         my_sub_list: [
             1,
             2,
-            3, # COMMENT F
+            3, # COMMENT H
         ],
     },
-    my_int_2: 2, # COMMENT G
-    my_list_int: [ # COMMENT H
+    my_int_2: 2, # COMMENT I
+    my_list_int: [ # COMMENT J
         2,
         2,
     ],
-    my_list_dict: [ # COMMENT I
+    my_list_dict: [ # COMMENT K
         {
             a: {
                 aa: 3,
@@ -34,7 +34,7 @@
             b: 2,
         },
     ],
-    my_list_list: [ # COMMENT J
+    my_list_list: [ # COMMENT L
         [
             1,
             1,
