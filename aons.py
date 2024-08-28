@@ -6,8 +6,7 @@ import dataclasses
 import pathlib
 import token
 import tokenize
-from io import BytesIO
-from typing import Any, Literal, cast, get_args
+from typing import Any, Iterator, Literal, cast, get_args
 
 _KeyLiteralTypes = Literal["str", "object", "list", "int", "float", "number", "boolean"]
 
@@ -52,16 +51,16 @@ class _Key(abc.ABC):
     def from_token_info_and_iterator(
         cls,
         token_info: tokenize.TokenInfo,
-        token_it: enumerate[tokenize.TokenInfo],
+        token_it: Iterator[tokenize.TokenInfo],
     ):
         """Creates a class instance out of a given token info and its iterator."""
         name = ""
         if token_info.type == token.NAME:
             name = token_info.string
-            _, token_info = next(token_it)
+            token_info = next(token_it)
             if token_info.type != token.OP or token_info.string != ":":
                 raise AonsKeyNotFollowedWithColon
-            _, token_info = next(token_it)
+            token_info = next(token_it)
         if token_info.type in [token.STRING, token.NUMBER]:
             value = token_info.string
             return _KeySingle.from_name_value_and_token_iterator(name, value, token_it)
@@ -101,13 +100,13 @@ class _Key(abc.ABC):
 class _KeySingle(_Key):
     @classmethod
     def from_name_value_and_token_iterator(
-        cls, name: str, value: Any, token_it: enumerate[tokenize.TokenInfo]
+        cls, name: str, value: Any, token_it: Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name, value and a token iterator."""
         token_type = cast(_KeyLiteralTypes, type(ast.literal_eval(value)).__name__)
         if token_type not in get_args(_KeyLiteralTypes):
             raise TypeError
-        _, token_info = next(token_it)
+        token_info = next(token_it)
         if token_info.type != token.OP and token_info.string != ",":
             raise AonsContentLineNotEndedWithComma
         if token_type == "str":
@@ -159,15 +158,15 @@ class _KeyObject(_Key):
 
     @classmethod
     def from_name_and_token_iterator(
-        cls, name: str | None, token_it: enumerate[tokenize.TokenInfo]
+        cls, name: str | None, token_it: Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
         last_key_name: str = ""
         key_dict: dict[str, Any] = {}
         comment: list[str] = []
-        for _, token_info in token_it:
+        for token_info in token_it:
             if token_info.type == token.OP and token_info.string == "}":
-                _, token_info = next(token_it)
+                token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
                 return cls(name, key_dict, comment="\n".join(comment))
@@ -201,14 +200,14 @@ class _KeyList(_Key):
 
     @classmethod
     def from_name_and_token_iterator(
-        cls, name: str | None, token_it: enumerate[tokenize.TokenInfo]
+        cls, name: str | None, token_it: Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
         value_list: list[_Key] = []
         comment: list[str] = []
-        for _, token_info in token_it:
+        for token_info in token_it:
             if token_info.type == token.OP and token_info.string == "]":
-                _, token_info = next(token_it)
+                token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
                 return cls(name, value_list, comment="\n".join(comment))
@@ -234,37 +233,44 @@ class _KeyList(_Key):
 
 
 class _AonsFile:
-    def __init__(self, file: pathlib.Path):
-        self._file: pathlib.Path = file
-        self._tokens = list(  # TODO: Check if we can't avoid creating this list.
-            tokenize.tokenize(BytesIO(self._file.read_bytes()).readline)
-        )
-        self._encoding = self._get_encoding()
-        self._entries = self._get_entries()
+    def __init__(self):
+        self._encoding = None
+        self._entries = None
+
+    @classmethod
+    def from_file(cls, file: pathlib.Path):
+        """Create and return an AONS instance from a given file."""
+        instance = cls()
+        with file.open("rb") as stream:
+            token_iterator = tokenize.tokenize(stream.readline)
+            instance._encoding = instance._get_encoding(token_iterator)
+            instance._entries = instance._get_entries(token_iterator)
+        return instance
+
+    @staticmethod
+    def _get_encoding(token_iterator) -> str:
+        """Get AONS file enconding from the first token."""
+        fisrt_token = next(token_iterator)
+        encoding = fisrt_token.string
+        if fisrt_token.type != token.ENCODING or encoding != "utf-8":
+            raise AonsWrongEncoding
+        return encoding
+
+    @staticmethod
+    def _get_entries(token_iterator):
+        """Iterates through the loaded tokens and returns a dictionary containing every entry."""
+        for token_info in token_iterator:
+            if token_info.type == token.OP and token_info.string == "{":
+                return _KeyObject.from_name_and_token_iterator(None, token_iterator)
+            if token_info.type == token.OP and token_info.string == "[":
+                return _KeyList.from_name_and_token_iterator(None, token_iterator)
+        raise AonsFileWithoutMainElement
 
     def __getitem__(self, key):
         return self._entries.value[key]
 
     def __setitem__(self, key, value):
         self._entries.value[key].value = value
-
-    def _get_encoding(self) -> str:
-        """Get AONS file enconding from the first token."""
-        fisrt_token = self._tokens[0]
-        encoding = fisrt_token.string
-        if fisrt_token.type != token.ENCODING or encoding != "utf-8":
-            raise AonsWrongEncoding
-        return encoding
-
-    def _get_entries(self):
-        """Iterates through the loaded tokens and returns a dictionary containing every entry."""
-        token_it = iter(enumerate(self._tokens))
-        for _, token_info in token_it:
-            if token_info.type == token.OP and token_info.string == "{":
-                return _KeyObject.from_name_and_token_iterator(None, token_it)
-            if token_info.type == token.OP and token_info.string == "[":
-                return _KeyList.from_name_and_token_iterator(None, token_it)
-        return AonsFileWithoutMainElement
 
     def get_dict(self) -> dict:
         """Returns a dictionary containing data from every entry."""
