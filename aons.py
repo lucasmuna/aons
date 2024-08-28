@@ -232,7 +232,9 @@ class _KeyList(_Key):
         )
 
 
-class _AonsFile:
+class Aons:
+    """Representation of an AONS object."""
+
     def __init__(self):
         self._encoding = None
         self._entries = None
@@ -285,26 +287,13 @@ class _AonsFile:
         return self._entries.get_dict_with_comment()
 
 
-class AonsSchema(_AonsFile):
-    """AONS schema base class."""
-
-    # Do we need to separate AonsData and AonsSchema?
-
-
-class AonsData(_AonsFile):
-    """AONS data base class."""
-
-    # Do we need to separate AonsData and AonsSchema?
+def load(file: pathlib.Path) -> Aons:
+    """Load an AONS file from a given path and return an Aons class instance."""
+    return Aons.from_file(file)
 
 
-def load(file: pathlib.Path):
-    """Load an AONS file from a given path and return an AonsFile class instance."""
-    raise NotImplementedError
-    # aons_file = _AonsFile(file)
-
-
-def validate(data: AonsData, schema: AonsSchema):
-    """Validate a given AONS data against a given AONS schema."""
+def validate(data: Aons, schema: Aons):
+    """Validate a given data against a given schema, both being Aons instances."""
     raise NotImplementedError
     # data = data.get_dict()
     # schema = schema.get_dict()
