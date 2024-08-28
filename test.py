@@ -6,8 +6,8 @@ import aons
 aons_data_file = pathlib.Path(__file__).parent / "data.aons"
 aons_schema_file = pathlib.Path(__file__).parent / "schema.aons"
 
-aons_data = aons.AonsData(aons_data_file)
-aons_schema = aons.AonsSchema(aons_schema_file)
+aons_data = aons.AonsData.from_file(aons_data_file)
+aons_schema = aons.AonsSchema.from_file(aons_schema_file)
 
 # print
 (aons_data.get_dict())
