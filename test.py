@@ -1,5 +1,5 @@
 import pathlib
-from pprint import pprint as print
+# from pprint import pprint as print
 
 import aons
 
@@ -12,14 +12,16 @@ aons_schema = aons.load(aons_schema_file)
 # print
 (aons_data.get_dict())
 (aons_data.get_dict_with_comments())
+print(aons_data.get_dict_with_comments()["main"]["__value__"]["my_string"]["__comment__"])
 
 # print
 (aons_schema.get_dict())
 (aons_schema.get_dict_with_comments())
 
-print(aons_data["my_list_int"][0])
+# print
+(aons_data["my_list_int"][0])
 aons_data["my_list_int"][0] = 1
-print(aons_data["my_list_int"][0])
+(aons_data["my_list_int"][0])
 
 # aons.load(aons_data_file)
 

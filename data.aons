@@ -2,8 +2,9 @@
 # A1
 # B2
 # C3
-{
+{ # COMMENT MAIN
     my_string: "my string value", # COMMENT A
+    # COMMENT A1
     my_string_2: "my string '2' value", # COMMENT B
     my_string_3: 'my string "3" value', # COMMENT C
     my_int: 1, # COMMENT D
