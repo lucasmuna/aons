@@ -1,0 +1,6 @@
+{
+    my_string: "value 1",
+    my_object: {
+        key_1: 1,
+    },
+},

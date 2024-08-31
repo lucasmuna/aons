@@ -1,29 +1,43 @@
 # IDEA/DRAFT: SCHEMA 2
 {
+    type: "object",
     parameters: {
         my_object: {
             type: "object",
-            default: {},
-            valid_values: [ 
-                "value_1",
-                "value_2",
-            ],
-            valid_keys: { # Comment
-                key_1: "string",
-                key_2: "object",
-                key_3: "int",
+            default: {
+                la: "1",
+            },
+            parameters: { # Comment A
+                key_1: {
+                    type: "string",
+                },
+                key_2: {
+                    type: "object",
+                },
+                key_3: {
+                    type: "int",
+                    default: 5,
+                },
             },
         },
         my_list: {
             type: "list",
             default: [],
-            valid_items: [
-                "string",
+            items: [
+                {
+                    type: "int",
+                    max: 10,
+                    min: 0,
+                },
             ],
         },
         my_string: {
             type: string,
             default: "",
+            enum: [
+                "value 1",
+                "value 2",
+            ],
         },
         my_int: {
             type: "int",
