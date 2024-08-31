@@ -15,6 +15,14 @@ class AonsFileWithoutMainElement(Exception):
     """This exception indicates that the given AONS file doesn't have a main element."""
 
 
+class AonsFileWithDuplicatetMainElement(Exception):
+    """This exception indicates that the given AONS file has two or more main elements."""
+
+
+class AonsFileWrongMainElement(Exception):
+    """This exception indicates that the given AONS file has wrong main element type."""
+
+
 class AonsUnknownKeyType(Exception):
     """This exception indicates that a unkown Key type was found."""
 
@@ -43,9 +51,9 @@ class _Comment:
 
 @dataclasses.dataclass
 class _Key(abc.ABC):
-    name: str | None
+    name: str
     value: Any
-    comment: str | None = None
+    comment: str = ""
 
     @classmethod
     def from_token_info_and_iterator(
@@ -158,7 +166,7 @@ class _KeyObject(_Key):
 
     @classmethod
     def from_name_and_token_iterator(
-        cls, name: str | None, token_it: Iterator[tokenize.TokenInfo]
+        cls, name: str, token_it: Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
         last_key_name: str = ""
@@ -173,7 +181,9 @@ class _KeyObject(_Key):
             if key := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(key, _Comment):
                     if last_key_name:
-                        key_dict[last_key_name].comment = key.value
+                        if key_dict[last_key_name].comment:
+                            key_dict[last_key_name].comment += "\n"
+                        key_dict[last_key_name].comment += key.value
                     else:
                         comment.append(key.value)
                 else:
@@ -200,7 +210,7 @@ class _KeyList(_Key):
 
     @classmethod
     def from_name_and_token_iterator(
-        cls, name: str | None, token_it: Iterator[tokenize.TokenInfo]
+        cls, name: str, token_it: Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
         value_list: list[_Key] = []
@@ -214,6 +224,8 @@ class _KeyList(_Key):
             if value := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(value, _Comment):
                     if value_list:
+                        if value_list[-1].comment:
+                            value_list[-1].comment += "\n"
                         value_list[-1].comment = value.value
                     else:
                         comment.append(value.value)
@@ -261,22 +273,37 @@ class Aons:
     @staticmethod
     def _get_entries(token_iterator):
         """Iterates through the loaded tokens and returns a dictionary containing every entry."""
+        entries = {
+            "pre": [],
+            "main": None,
+            "pos": [],
+        }
         for token_info in token_iterator:
-            if token_info.type == token.OP and token_info.string == "{":
-                return _KeyObject.from_name_and_token_iterator(None, token_iterator)
-            if token_info.type == token.OP and token_info.string == "[":
-                return _KeyList.from_name_and_token_iterator(None, token_iterator)
-        raise AonsFileWithoutMainElement
+            key = _Key.from_token_info_and_iterator(token_info, token_iterator)
+            if isinstance(key, (_KeyObject, _KeyList)):
+                if entries["main"]:
+                    raise AonsFileWithDuplicatetMainElement
+                entries["main"] = key
+            elif isinstance(key, _KeySingle):
+                raise AonsFileWrongMainElement
+            elif isinstance(key, _Comment):
+                if not entries["main"]:
+                    entries["pre"].append(key)
+                else:
+                    entries["pos"].append(key)
+        if not entries["main"]:
+            raise AonsFileWithoutMainElement
+        return entries
 
     def __getitem__(self, key):
-        return self._entries.value[key]
+        return self._entries["main"].value[key]
 
     def __setitem__(self, key, value):
-        self._entries.value[key].value = value
+        self._entries["main"].value[key].value = value
 
     def get_dict(self) -> dict:
         """Returns a dictionary containing data from every entry."""
-        return self._entries.get_dict()
+        return self._entries["main"].get_dict()
 
     def get_dict_with_comments(self) -> dict:
         """Returns a dictionary containing data and comments from every entry.
@@ -284,7 +311,24 @@ class Aons:
         The user should expect an additional layer of keys to the dictionary in order to
          incorporate both data and comments.
         """
-        return self._entries.get_dict_with_comment()
+
+        def get_items(items: list[_Key]) -> list[str | dict]:
+            return [
+                (
+                    item.get_dict_with_comment()
+                    if hasattr(item, "get_dict_with_comment")
+                    else item.value
+                )
+                for item in items
+            ]
+
+        entries = {
+            "pre": get_items(self._entries["pre"]),
+            "main": self._entries["main"].get_dict_with_comment(),
+            "pos": get_items(self._entries["pos"]),
+        }
+
+        return entries
 
 
 def load(file: pathlib.Path) -> Aons:
