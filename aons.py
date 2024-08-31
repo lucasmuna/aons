@@ -6,9 +6,11 @@ import dataclasses
 import pathlib
 import token
 import tokenize
-from typing import Any, Iterator, Literal, cast, get_args
+import typing as t
 
-_KeyLiteralTypes = Literal["str", "object", "list", "int", "float", "number", "boolean"]
+_KeyLiteralTypes = t.Literal[
+    "str", "object", "list", "int", "float", "number", "boolean"
+]
 
 
 class AonsFileWithoutMainElement(Exception):
@@ -52,14 +54,14 @@ class _Comment:
 @dataclasses.dataclass
 class _Key(abc.ABC):
     name: str
-    value: Any
+    value: t.Any
     comment: str = ""
 
     @classmethod
     def from_token_info_and_iterator(
         cls,
         token_info: tokenize.TokenInfo,
-        token_it: Iterator[tokenize.TokenInfo],
+        token_it: t.Iterator[tokenize.TokenInfo],
     ):
         """Creates a class instance out of a given token info and its iterator."""
         name = ""
@@ -88,10 +90,10 @@ class _Key(abc.ABC):
         self.value[key].value = value
 
     @abc.abstractmethod
-    def get_dict(self) -> Any:  # We should probably change this method name
+    def get_dict(self) -> t.Any:  # We should probably change this method name
         """Returns a dictionary containing the respective instance data."""
 
-    def _dict_with_comments_template(self, value: Any):
+    def _dict_with_comments_template(self, value: t.Any):
         return {"__comment__": self.comment, "__value__": value}
 
     @abc.abstractmethod
@@ -108,11 +110,11 @@ class _Key(abc.ABC):
 class _KeySingle(_Key):
     @classmethod
     def from_name_value_and_token_iterator(
-        cls, name: str, value: Any, token_it: Iterator[tokenize.TokenInfo]
+        cls, name: str, value: t.Any, token_it: t.Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name, value and a token iterator."""
-        token_type = cast(_KeyLiteralTypes, type(ast.literal_eval(value)).__name__)
-        if token_type not in get_args(_KeyLiteralTypes):
+        token_type = t.cast(_KeyLiteralTypes, type(ast.literal_eval(value)).__name__)
+        if token_type not in t.get_args(_KeyLiteralTypes):
             raise TypeError
         token_info = next(token_it)
         if token_info.type != token.OP and token_info.string != ",":
@@ -162,15 +164,15 @@ class _KeyString(_KeySingle):
 
 @dataclasses.dataclass
 class _KeyObject(_Key):
-    value: dict[str, Any]
+    value: dict[str, t.Any]
 
     @classmethod
     def from_name_and_token_iterator(
-        cls, name: str, token_it: Iterator[tokenize.TokenInfo]
+        cls, name: str, token_it: t.Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
         last_key_name: str = ""
-        key_dict: dict[str, Any] = {}
+        key_dict: dict[str, t.Any] = {}
         comment: list[str] = []
         for token_info in token_it:
             if token_info.type == token.OP and token_info.string == "}":
@@ -210,7 +212,7 @@ class _KeyList(_Key):
 
     @classmethod
     def from_name_and_token_iterator(
-        cls, name: str, token_it: Iterator[tokenize.TokenInfo]
+        cls, name: str, token_it: t.Iterator[tokenize.TokenInfo]
     ):
         """Creates a class instance out of a name and a token iterator."""
         value_list: list[_Key] = []
