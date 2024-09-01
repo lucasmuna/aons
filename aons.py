@@ -2,6 +2,7 @@
 
 import abc
 import ast
+import copy
 import dataclasses
 import pathlib
 import token
@@ -14,35 +15,64 @@ _KeyLiteralTypes = t.Literal[
 
 
 class AonsFileWithoutMainElement(Exception):
-    """This exception indicates that the given AONS file doesn't have a main element."""
+    """The given AONS file doesn't have a main element."""
 
 
 class AonsFileWithDuplicatetMainElement(Exception):
-    """This exception indicates that the given AONS file has two or more main elements."""
+    """The given AONS file has two or more main elements."""
 
 
 class AonsFileWrongMainElement(Exception):
-    """This exception indicates that the given AONS file has wrong main element type."""
+    """The given AONS file has wrong main element type."""
 
 
 class AonsUnknownKeyType(Exception):
-    """This exception indicates that a unkown Key type was found."""
+    """An unkown Key type was found."""
 
 
 class AonsWrongEncoding(Exception):
-    """This exception indicates that the given AONS file is not UTF-8 encoded."""
+    """The given AONS file is not UTF-8 encoded."""
 
 
 class AonsContentLineNotEndedWithComma(Exception):
-    """This exception indicates that a content line of an AONS file doesn't end with a comma."""
+    """A content line of an AONS file doesn't end with a comma."""
 
 
 class AonsKeyNotFollowedWithColon(Exception):
-    """This exception indicates that a key of an AONS file isn't followed by a colon."""
+    """A key of an AONS file isn't followed by a colon."""
+
+
+class AonsSchemaFileNotDict(Exception):
+    """The given AONS schema is not a dict."""
+
+
+class AonsSchemaInvalidElement(Exception):
+    """The given AONS schema has an invalid element."""
+
+
+class AonsMissingRequiredItem(Exception):
+    """A given AONS data is missing required item(s) from a given AONS schema."""
+
+
+class AonsAdditionalItems(Exception):
+    """A given AONS data has additional item(s) than a given AONS schema."""
+
+
+class AonsValueNotAllowed(Exception):
+    """A given AONS item was not found in a given AONS schema enumeration."""
+
+
+class AonsWrontTypeMatching(Exception):
+    """A given AONS data type doesn't match a given AONS schema type."""
 
 
 @dataclasses.dataclass
-class _Comment:
+class _Item:
+    value: t.Any
+
+
+@dataclasses.dataclass
+class _Comment(_Item):
     value: str = ""
 
     @classmethod
@@ -52,10 +82,22 @@ class _Comment:
 
 
 @dataclasses.dataclass
-class _Key(abc.ABC):
+class Key(_Item):
+    """Interface to a common Key."""
+
     name: str
-    value: t.Any
     comment: str = ""
+
+    # We have to have separate impl for single list and dict
+    def __getitem__(self, key):
+        return self.value[key]
+
+    def __setitem__(self, key, value):
+        self.value[key].value = value
+
+
+@dataclasses.dataclass
+class _Key(Key, abc.ABC):
 
     @classmethod
     def from_token_info_and_iterator(
@@ -73,21 +115,16 @@ class _Key(abc.ABC):
             token_info = next(token_it)
         if token_info.type in [token.STRING, token.NUMBER]:
             value = token_info.string
-            return _KeySingle.from_name_value_and_token_iterator(name, value, token_it)
+            return _KeySingle.from_name_value_and_token_iterator(
+                name=name, value=value, token_it=token_it
+            )
         if token_info.type == token.OP and token_info.string == "{":
-            return _KeyObject.from_name_and_token_iterator(name, token_it)
+            return _KeyObject.from_name_and_token_iterator(name=name, token_it=token_it)
         if token_info.type == token.OP and token_info.string == "[":
-            return _KeyList.from_name_and_token_iterator(name, token_it)
+            return _KeyList.from_name_and_token_iterator(name=name, token_it=token_it)
         if token_info.type == token.COMMENT:
-            return _Comment.from_token(token_info)
+            return _Comment.from_token(token_info=token_info)
         return None
-
-    # We have to have separate impl for single list and dict
-    def __getitem__(self, key):
-        return self.value[key]
-
-    def __setitem__(self, key, value):
-        self.value[key].value = value
 
     @abc.abstractmethod
     def get_dict(self) -> t.Any:  # We should probably change this method name
@@ -120,11 +157,11 @@ class _KeySingle(_Key):
         if token_info.type != token.OP and token_info.string != ",":
             raise AonsContentLineNotEndedWithComma
         if token_type == "str":
-            return _KeyString(name, value)
+            return _KeyString(name=name, value=value)
         if token_type == "float":
-            return _KeyFloat(name, value)
+            return _KeyFloat(name=name, value=value)
         if token_type == "int":
-            return _KeyInteger(name, value)
+            return _KeyInteger(name=name, value=value)
         raise AonsUnknownKeyType
 
     def get_dict(self) -> dict:
@@ -179,7 +216,7 @@ class _KeyObject(_Key):
                 token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name, key_dict, comment="\n".join(comment))
+                return cls(name=name, value=key_dict, comment="\n".join(comment))
             if key := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(key, _Comment):
                     if last_key_name:
@@ -222,7 +259,7 @@ class _KeyList(_Key):
                 token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name, value_list, comment="\n".join(comment))
+                return cls(name=name, value=value_list, comment="\n".join(comment))
             if value := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(value, _Comment):
                     if value_list:
@@ -246,22 +283,28 @@ class _KeyList(_Key):
         )
 
 
+@dataclasses.dataclass
+class _Entries:
+    main: _Key
+    pre: list[_Item]
+    pos: list[_Item]
+
+
 class Aons:
     """Representation of an AONS object."""
 
-    def __init__(self):
-        self._encoding = None
-        self._entries = None
+    def __init__(self, encoding: str, entries: _Entries):
+        self._encoding: str = encoding
+        self._entries: _Entries = entries
 
     @classmethod
     def from_file(cls, file: pathlib.Path):
         """Create and return an AONS instance from a given file."""
-        instance = cls()
         with file.open("rb") as stream:
             token_iterator = tokenize.tokenize(stream.readline)
-            instance._encoding = instance._get_encoding(token_iterator)
-            instance._entries = instance._get_entries(token_iterator)
-        return instance
+            encoding = cls._get_encoding(token_iterator)
+            entries = cls._get_entries(token_iterator)
+        return cls(encoding=encoding, entries=entries)
 
     @staticmethod
     def _get_encoding(token_iterator) -> str:
@@ -273,39 +316,37 @@ class Aons:
         return encoding
 
     @staticmethod
-    def _get_entries(token_iterator):
+    def _get_entries(token_iterator) -> _Entries:
         """Iterates through the loaded tokens and returns a dictionary containing every entry."""
-        entries = {
-            "pre": [],
-            "main": None,
-            "pos": [],
-        }
+        main: _Key | None = None
+        pre: list[_Item] = []
+        pos: list[_Item] = []
         for token_info in token_iterator:
             key = _Key.from_token_info_and_iterator(token_info, token_iterator)
             if isinstance(key, (_KeyObject, _KeyList)):
-                if entries["main"]:
+                if main:
                     raise AonsFileWithDuplicatetMainElement
-                entries["main"] = key
+                main = key
             elif isinstance(key, _KeySingle):
                 raise AonsFileWrongMainElement
             elif isinstance(key, _Comment):
-                if not entries["main"]:
-                    entries["pre"].append(key)
+                if not main:
+                    pre.append(key)
                 else:
-                    entries["pos"].append(key)
-        if not entries["main"]:
+                    pos.append(key)
+        if not main:
             raise AonsFileWithoutMainElement
-        return entries
+        return _Entries(main, pre, pos)
 
     def __getitem__(self, key):
-        return self._entries["main"].value[key]
+        return self._entries.main.value[key]
 
     def __setitem__(self, key, value):
-        self._entries["main"].value[key].value = value
+        self._entries.main.value[key].value = value
 
     def get_dict(self) -> dict:
         """Returns a dictionary containing data from every entry."""
-        return self._entries["main"].get_dict()
+        return self._entries.main.get_dict()
 
     def get_dict_with_comments(self) -> dict:
         """Returns a dictionary containing data and comments from every entry.
@@ -314,7 +355,7 @@ class Aons:
          incorporate both data and comments.
         """
 
-        def get_items(items: list[_Key]) -> list[str | dict]:
+        def get_items(items: list[_Item]) -> list[str | dict]:
             return [
                 (
                     item.get_dict_with_comment()
@@ -325,11 +366,13 @@ class Aons:
             ]
 
         entries = {
-            "pre": get_items(self._entries["pre"]),
-            "main": self._entries["main"].get_dict_with_comment(),
-            "pos": get_items(self._entries["pos"]),
+            "pre": get_items(self._entries.pre),
+            "main": self._entries.main.get_dict_with_comment(),
+            "pos": get_items(self._entries.pos),
         }
 
+        # We should not return entries but only main.
+        # We could maybe offer more methods to get comments or future anchors.
         return entries
 
 
@@ -338,8 +381,81 @@ def load(file: pathlib.Path) -> Aons:
     return Aons.from_file(file)
 
 
-def validate(data: Aons, schema: Aons):
+class _SchemaVisitor:
+
+    @staticmethod
+    def get_default(element: _KeyObject) -> dict[str, t.Any]:
+        """Returns every item that has a default value from a given elemenet."""
+        item_object = element.value["parameters"].value
+        return {
+            item: item_object[item].value["default"]
+            for item in item_object
+            if "default" in item_object[item].value
+        }
+
+    @staticmethod
+    def get_required(element: _KeyObject) -> list[str]:
+        """Returns the required items of a given element."""
+        if "required" not in element.value:
+            return []
+        return [item.value for item in element.value["required"]]
+
+    @staticmethod
+    def get_enum(element: _KeyObject) -> list[t.Any]:
+        """Returns the enumaration of allowed values from a given element."""
+        if "enum" not in element.value:
+            return []
+        return element.value["enum"]
+
+
+def validate(data: Aons, schema: Aons) -> Aons:
     """Validate a given data against a given schema, both being Aons instances."""
-    raise NotImplementedError
-    # data = data.get_dict()
-    # schema = schema.get_dict()
+    data_deep_copy = copy.deepcopy(data)
+
+    data_object = data_deep_copy._entries.main
+    schema_object = schema._entries.main
+
+    if not isinstance(schema_object, _KeyObject):
+        raise AonsSchemaFileNotDict
+
+    def validate_item(data_object: _Key, schema_object: _Key) -> bool:
+        default_items = {}
+        missing_items = []
+        additional_items = []
+        # if type(data_object) != type(schema_object):
+        #     # TODO: Add type matching, need to get type from schema
+        #     raise AonsWrontTypeMatching(type(data_object), type(schema_object))
+        if isinstance(data_object, _KeyObject):
+            if "parameters" not in schema_object.value:
+                raise AonsSchemaInvalidElement
+            default_items = _SchemaVisitor.get_default(schema_object)
+            missing_items = _SchemaVisitor.get_required(schema_object)
+            for item in data_object.value:
+                if item in missing_items:
+                    missing_items.pop(missing_items.index(item))
+                if item in default_items:
+                    default_items.pop(item)
+                if item not in schema_object.value["parameters"].value:
+                    additional_items.append(item)
+            if missing_items:
+                raise AonsMissingRequiredItem(missing_items)
+            if additional_items:
+                raise AonsAdditionalItems(additional_items)
+            for item in data_object.value:
+                validate_item(
+                    data_object[item],
+                    schema_object.value["parameters"][item],
+                )
+            if default_items:
+                for item in default_items:
+                    data_object.value[item] = copy.deepcopy(default_items[item])
+        if isinstance(data_object, _KeySingle):
+            if enum := _SchemaVisitor.get_enum(schema_object):
+                if data_object.value not in enum.get_dict():
+                    raise AonsValueNotAllowed
+
+        return True
+
+    validate_item(data_object, schema_object)
+
+    return data_deep_copy
