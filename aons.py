@@ -70,6 +70,14 @@ class AonsUnknownBooleanValueType(Exception):
     """An unkown boolean value type was found."""
 
 
+class AonsInvalidItemType(Exception):
+    """An invalid item type was found."""
+
+
+class AonsInvalidItemValue(Exception):
+    """An invalid item value was found."""
+
+
 @dataclasses.dataclass
 class _Item:
     value: t.Any
