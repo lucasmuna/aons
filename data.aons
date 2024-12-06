@@ -3,6 +3,7 @@
 # B2
 # C3
 { # COMMENT MAIN
+# LALA
     my_string: "my string value", # COMMENT A
     # COMMENT A1
     my_string_2: "my string '2' value", # COMMENT B
@@ -36,6 +37,8 @@
         },
     ],
     my_list_list: [ # COMMENT L
+    # M
+    # N
         [
             1,
             1,
@@ -45,5 +48,6 @@
             2,
         ],
     ],
+    my_boolean: True,
 },
 # D4

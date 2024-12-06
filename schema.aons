@@ -22,17 +22,30 @@
         },
         my_list: {
             type: "list",
-            default: [],
-            items: [
-                {
-                    type: "int",
-                    max: 10,
-                    min: 0,
-                },
+            default: [
+                1,
             ],
+            items: {
+                type: "int",
+                max: 10,
+                min: 0,
+            },
+        },
+        my_list_2: {
+            type: "list",
+            default: [
+                "a",
+            ],
+            items: {
+                type: "string",
+                enum: [
+                    "a",
+                    "b",
+                ],
+            },
         },
         my_string: {
-            type: string,
+            type: "string",
             default: "",
             enum: [
                 "value 1",
@@ -45,15 +58,19 @@
         },
         my_float:  {
             type: "float",
-            default: 0,
+            default: 0.0,
         },
         my_number:  {
+            type: "number",
+            default: 0.0,
+        },
+        my_number_2:  {
             type: "number",
             default: 0,
         },
         my_boolean: {
             type: "boolean",
-            default: "True",
+            default: True,
         },
     },
     required: [
