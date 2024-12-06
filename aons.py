@@ -90,7 +90,7 @@ class Key(_Item):
     """Interface to a common Key."""
 
     name: str
-    comment: str = ""
+    comment: list[str] = dataclasses.field(default_factory=lambda: [])
 
     # We have to have separate impl for single list and dict
     def __getitem__(self, key):
@@ -220,13 +220,11 @@ class _KeyObject(_Key):
                 token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name=name, value=key_dict, comment="\n".join(comment))
+                return cls(name=name, value=key_dict, comment=comment)
             if key := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(key, _Comment):
                     if last_key_name:
-                        if key_dict[last_key_name].comment:
-                            key_dict[last_key_name].comment += "\n"
-                        key_dict[last_key_name].comment += key.value
+                        key_dict[last_key_name].comment.append(key.value)
                     else:
                         comment.append(key.value)
                 else:
@@ -263,13 +261,11 @@ class _KeyList(_Key):
                 token_info = next(token_it)
                 if token_info.type != token.OP and token_info.string != ",":
                     raise AonsContentLineNotEndedWithComma
-                return cls(name=name, value=value_list, comment="\n".join(comment))
+                return cls(name=name, value=value_list, comment=comment)
             if value := _Key.from_token_info_and_iterator(token_info, token_it):
                 if isinstance(value, _Comment):
                     if value_list:
-                        if value_list[-1].comment:
-                            value_list[-1].comment += "\n"
-                        value_list[-1].comment = value.value
+                        value_list[-1].comment.append(value.value)
                     else:
                         comment.append(value.value)
                 else:
