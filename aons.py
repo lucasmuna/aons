@@ -66,6 +66,10 @@ class AonsWrontTypeMatching(Exception):
     """A given AONS data type doesn't match a given AONS schema type."""
 
 
+class AonsUnknownBooleanValueType(Exception):
+    """An unkown boolean value type was found."""
+
+
 @dataclasses.dataclass
 class _Item:
     value: t.Any
@@ -122,6 +126,11 @@ class _Key(Key, abc.ABC):
             return _KeySingle.from_name_value_and_token_iterator(
                 name=name, value=value, token_it=token_it
             )
+        if token_info.type == token.NAME:
+            value = token_info.string
+            if value in ["True", "False"]:
+                return _KeyBoolean(name=name, value=value)
+            raise AonsUnknownBooleanValueType
         if token_info.type == token.OP and token_info.string == "{":
             return _KeyObject.from_name_and_token_iterator(name=name, token_it=token_it)
         if token_info.type == token.OP and token_info.string == "[":
@@ -149,6 +158,7 @@ class _Key(Key, abc.ABC):
 
 @dataclasses.dataclass
 class _KeySingle(_Key):
+
     @classmethod
     def from_name_value_and_token_iterator(
         cls, name: str, value: t.Any, token_it: t.Iterator[tokenize.TokenInfo]
@@ -201,6 +211,19 @@ class _KeyString(_KeySingle):
         assert self.value[0] in ['"', "'"]
         assert self.value[-1] in ['"', "'"]
         self.value = self.value[1:-1]
+
+
+@dataclasses.dataclass
+class _KeyBoolean(_KeySingle):
+    value: bool
+
+    def __post_init__(self):
+        if self.value == "True":
+            self.value = True
+        elif self.value == "False":
+            self.value = False
+        else:
+            raise AonsUnknownBooleanValueType
 
 
 @dataclasses.dataclass
