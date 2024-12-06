@@ -407,6 +407,58 @@ class Aons:
         return entries
 
 
+def _dumps(item: _Item, level=0, indent=4) -> list[str]:
+
+    def _indented_key_value_comment(
+        tab: str, item: _Key, value: t.Optional[str] = None
+    ) -> str:
+        text = (
+            f"{tab}"
+            f"{(item.name + ': ') if item.name else ''}"
+            f"{(str(item.value) + ",") if not value else value}"
+        )
+        tab = len(text) + 1
+        first = True
+        for comment in item.comment:
+            if first:
+                text += f" {comment}"
+                first = False
+            else:
+                text += f"\n{' '*tab}{comment}"
+        return text
+
+    content = []
+    tab = indent * level * " "
+
+    if isinstance(item, _Items):
+        for value in item:
+            content.extend(_dumps(value, level=level + 1, indent=indent))
+    if isinstance(item, _Comment):
+        content.append(f"{item.value}")
+    if isinstance(item, _KeySingle):
+        content.append(_indented_key_value_comment(tab=tab, item=item))
+    if isinstance(item, _KeyObject):
+        content.append(_indented_key_value_comment(tab=tab, item=item, value="{"))
+        for value in item.value.values():
+            content.extend(_dumps(value, level=level + 1, indent=indent))
+        content.append(f"{tab}{'},'}")
+    if isinstance(item, _KeyList):
+        content.append(_indented_key_value_comment(tab=tab, item=item, value="["))
+        for value in item.value:
+            content.extend(_dumps(value, level=level + 1, indent=indent))
+        content.append(f"{tab}{'],'}")
+    return content
+
+
+def dumps(obj: Aons, indent=4) -> str:
+    """Return a string that represents a given Aons object."""
+    return "\n".join(
+        _dumps(obj._entries.pre, indent=indent)
+        + _dumps(obj._entries.main, indent=indent)
+        + _dumps(obj._entries.pos, indent=indent)
+    )
+
+
 def load(file: pathlib.Path) -> Aons:
     """Load an AONS file from a given path and return an Aons class instance."""
     return Aons.from_file(file)

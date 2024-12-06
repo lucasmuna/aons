@@ -1,5 +1,5 @@
 import pathlib
-from pprint import pprint as print
+# from pprint import pprint as print
 
 import aons
 
@@ -32,12 +32,12 @@ aons_data["my_list_int"][0] = 1
 (aons_data["my_list_int"][0])
 
 # print: show case validation of a data against a schema (default, enums, required, etc)
-print(aons_compliant_data.get_dict())
+(aons_compliant_data.get_dict())
 aons_validated_data = aons.validate(aons_compliant_data, aons_schema)
-print(aons_validated_data.get_dict())
+(aons_validated_data.get_dict())
 aons_validated_data["my_list"] = [1]
-print(aons_validated_data["my_list"])
-print(aons_schema["parameters"]["my_list"]["default"])
+(aons_validated_data["my_list"])
+(aons_schema["parameters"]["my_list"]["default"])
 
 
 # print: show case validation for additional and missing required
@@ -45,11 +45,13 @@ try:
     aons.validate(aons_additional_data, aons_schema)
     assert False
 except Exception as exception:
-    print(exception)
+    (exception)
     assert type(exception) == aons.AonsAdditionalItems
 try:
     aons.validate(aons_missing_required_data, aons_schema)
     assert False
 except Exception as exception:
-    print(exception)
+    (exception)
     assert type(exception) == aons.AonsMissingRequiredItem
+
+(aons.dumps(aons_data))
