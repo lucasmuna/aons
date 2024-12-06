@@ -425,10 +425,10 @@ class _SchemaVisitor:
 
     @staticmethod
     def get_enum(element: _KeyObject) -> list[t.Any]:
-        """Returns the enumaration of allowed values from a given element."""
+        """Returns the enumaration of allowed values for a given element."""
         if "enum" not in element.value:
             return []
-        return element.value["enum"]
+        return element.value["enum"].get_dict()
 
 
 def validate(data: Aons, schema: Aons) -> Aons:
@@ -474,7 +474,7 @@ def validate(data: Aons, schema: Aons) -> Aons:
                     data_object.value[item] = copy.deepcopy(default_items[item])
         if isinstance(data_object, _KeySingle):
             if enum := _SchemaVisitor.get_enum(schema_object):
-                if data_object.value not in enum.get_dict():
+                if data_object.value not in enum:
                     raise AonsValueNotAllowed
 
         return True
