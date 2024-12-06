@@ -429,6 +429,34 @@ class _SchemaVisitor:
         if "enum" not in element.value:
             return []
         return element.value["enum"].get_dict()
+    
+    @staticmethod
+    def get_max(element: _KeyObject) -> list[t.Any]:
+        """Returns the maximum allowed value for a given element."""
+        if "max" not in element.value:
+            return []
+        return element.value["max"].get_dict()
+    
+    @staticmethod
+    def get_min(element: _KeyObject) -> list[t.Any]:
+        """Returns the maximum allowed value for a given element."""
+        if "min" not in element.value:
+            return []
+        return element.value["min"].get_dict()
+
+    @staticmethod
+    def get_type(element: _KeyObject) -> type[_Key]:
+        type_map = {
+            "object": _KeyObject,
+            "list": _KeyList,
+            "string": _KeyString,
+            "float": _KeyFloat,
+            "int": _KeyInteger,
+            "number": _KeyFloat | _KeyInteger,
+            "boolean": _KeyBoolean,
+        }
+        schema_type_string = element.value["type"].value
+        return type_map[schema_type_string]
 
 
 def validate(data: Aons, schema: Aons) -> Aons:
@@ -441,41 +469,68 @@ def validate(data: Aons, schema: Aons) -> Aons:
     if not isinstance(schema_object, _KeyObject):
         raise AonsSchemaFileNotDict
 
-    def validate_item(data_object: _Key, schema_object: _Key) -> bool:
-        default_items = {}
-        missing_items = []
+    def get_items(
+        data_object: _Key, schema_object: _Key
+    ) -> tuple[dict[str, t.Any], dict[str, t.Any], list[str]]:
+        default_items = _SchemaVisitor.get_default(schema_object)
+        missing_items = _SchemaVisitor.get_required(schema_object)
         additional_items = []
-        # if type(data_object) != type(schema_object):
-        #     # TODO: Add type matching, need to get type from schema
-        #     raise AonsWrontTypeMatching(type(data_object), type(schema_object))
+        for item in data_object.value:
+            if item in missing_items:
+                missing_items.pop(missing_items.index(item))
+            if item in default_items:
+                default_items.pop(item)
+            if item not in schema_object.value["parameters"].value:
+                additional_items.append(item)
+        return default_items, missing_items, additional_items
+
+    def validate_item(data_object: _Key, schema_object: _Key) -> bool:
+        schema_type = _SchemaVisitor.get_type(schema_object)
+
+        if not isinstance(data_object, schema_type):
+            raise AonsWrontTypeMatching(type(data_object), schema_type)
+
         if isinstance(data_object, _KeyObject):
-            if "parameters" not in schema_object.value:
-                raise AonsSchemaInvalidElement
-            default_items = _SchemaVisitor.get_default(schema_object)
-            missing_items = _SchemaVisitor.get_required(schema_object)
-            for item in data_object.value:
-                if item in missing_items:
-                    missing_items.pop(missing_items.index(item))
-                if item in default_items:
-                    default_items.pop(item)
-                if item not in schema_object.value["parameters"].value:
-                    additional_items.append(item)
+            for key in schema_object.value:
+                if key not in ["type", "default", "parameters", "required"]:
+                    raise AonsSchemaInvalidElement
+            default_items, missing_items, additional_items = get_items(
+                data_object, schema_object
+            )
             if missing_items:
                 raise AonsMissingRequiredItem(missing_items)
             if additional_items:
                 raise AonsAdditionalItems(additional_items)
+            if default_items:
+                for item in default_items:
+                    data_object.value[item] = copy.deepcopy(default_items[item])
             for item in data_object.value:
                 validate_item(
                     data_object[item],
                     schema_object.value["parameters"][item],
                 )
-            if default_items:
-                for item in default_items:
-                    data_object.value[item] = copy.deepcopy(default_items[item])
-        if isinstance(data_object, _KeySingle):
+        elif isinstance(data_object, _KeyList):
+            for key in schema_object.value:
+                if key not in ["type", "default", "items"]:
+                    raise AonsSchemaInvalidElement
+            for item in data_object.value:
+                validate_item(item, schema_object.value["items"])
+        elif isinstance(data_object, _KeySingle):
+            for key in schema_object.value:
+                if key not in ["type", "max", "min", "enum", "default"]:
+                    raise AonsSchemaInvalidElement
             if enum := _SchemaVisitor.get_enum(schema_object):
                 if data_object.value not in enum:
                     raise AonsValueNotAllowed
+            if isinstance(data_object, _KeyInteger | _KeyFloat):
+                if max_value := _SchemaVisitor.get_max(schema_object):
+                    if data_object.value > max_value:
+                        raise AonsInvalidItemValue
+                if min_value := _SchemaVisitor.get_min(schema_object):
+                    if data_object.value < min_value:
+                        raise AonsInvalidItemValue
+        else:
+            raise AonsSchemaInvalidElement
 
         return True
 
