@@ -72,6 +72,10 @@ class _Item:
 
 
 @dataclasses.dataclass
+class _Items(list[_Item]): ...
+
+
+@dataclasses.dataclass
 class _Comment(_Item):
     value: str = ""
 
@@ -286,8 +290,8 @@ class _KeyList(_Key):
 @dataclasses.dataclass
 class _Entries:
     main: _Key
-    pre: list[_Item]
-    pos: list[_Item]
+    pre: _Items
+    pos: _Items
 
 
 class Aons:
@@ -319,8 +323,8 @@ class Aons:
     def _get_entries(token_iterator) -> _Entries:
         """Iterates through the loaded tokens and returns a dictionary containing every entry."""
         main: _Key | None = None
-        pre: list[_Item] = []
-        pos: list[_Item] = []
+        pre = _Items()
+        pos = _Items()
         for token_info in token_iterator:
             key = _Key.from_token_info_and_iterator(token_info, token_iterator)
             if isinstance(key, (_KeyObject, _KeyList)):
